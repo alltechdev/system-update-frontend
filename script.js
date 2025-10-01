@@ -1,0 +1,293 @@
+class UpdateManager {
+    constructor() {
+        this.updates = {};
+        this.latestVersion = '';
+        this.init();
+    }
+
+    init() {
+        this.setupTabs();
+        this.setupForm();
+        this.setupButtons();
+        this.setupPreview();
+        this.updateJSON();
+    }
+
+    setupTabs() {
+        const tabButtons = document.querySelectorAll('.tab-button');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const targetTab = button.dataset.tab;
+                
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                tabContents.forEach(content => content.classList.remove('active'));
+                
+                button.classList.add('active');
+                document.getElementById(targetTab).classList.add('active');
+                
+                if (targetTab === 'json') {
+                    this.updateJSON();
+                } else if (targetTab === 'preview') {
+                    this.updatePreview();
+                }
+            });
+        });
+    }
+
+    setupForm() {
+        const form = document.getElementById('updateForm');
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.addUpdate();
+        });
+    }
+
+    setupButtons() {
+        document.getElementById('copyJson').addEventListener('click', () => {
+            this.copyJSON();
+        });
+
+        document.getElementById('downloadJson').addEventListener('click', () => {
+            this.downloadJSON();
+        });
+    }
+
+    setupPreview() {
+        const checkBtn = document.getElementById('previewCheckBtn');
+        const updateBtn = document.getElementById('previewUpdateBtn');
+        const status = document.getElementById('previewStatus');
+        const progress = document.getElementById('previewProgress');
+
+        checkBtn.addEventListener('click', () => {
+            if (this.latestVersion) {
+                status.textContent = `Update available: v${this.latestVersion}`;
+                updateBtn.style.display = 'inline-block';
+            } else {
+                status.textContent = 'No updates configured yet';
+            }
+        });
+
+        updateBtn.addEventListener('click', () => {
+            progress.style.display = 'block';
+            updateBtn.style.display = 'none';
+            status.textContent = 'Downloading update...';
+            
+            setTimeout(() => {
+                status.textContent = 'Installing update...';
+            }, 1500);
+            
+            setTimeout(() => {
+                status.textContent = 'Update completed successfully!';
+                progress.style.display = 'none';
+            }, 3000);
+        });
+    }
+
+    addUpdate() {
+        const version = document.getElementById('version').value;
+        const description = document.getElementById('description').value;
+        const scriptUrl = document.getElementById('scriptUrl').value;
+        const apkUrl = document.getElementById('apkUrl').value;
+        const fileSize = document.getElementById('fileSize').value;
+        const changelog = document.getElementById('changelog').value;
+
+        if (!version) {
+            alert('Version number is required');
+            return;
+        }
+
+        const update = {
+            description: description || `System update v${version}`,
+            file_size: fileSize || '1.0MB'
+        };
+
+        if (scriptUrl) update.script_url = scriptUrl;
+        if (apkUrl) update.apk_url = apkUrl;
+
+        if (changelog) {
+            update.changelog = changelog.split('\n')
+                .map(line => line.trim())
+                .filter(line => line.length > 0);
+        }
+
+        this.updates[version] = update;
+        this.latestVersion = this.getLatestVersion();
+        
+        this.renderUpdates();
+        this.updateJSON();
+        document.getElementById('updateForm').reset();
+    }
+
+    getLatestVersion() {
+        const versions = Object.keys(this.updates);
+        if (versions.length === 0) return '';
+        
+        return versions.sort((a, b) => {
+            const aNum = parseFloat(a);
+            const bNum = parseFloat(b);
+            return bNum - aNum;
+        })[0];
+    }
+
+    renderUpdates() {
+        const container = document.getElementById('updatesList');
+        
+        if (Object.keys(this.updates).length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-inbox"></i>
+                    <p>No updates added yet. Add your first update above!</p>
+                </div>
+            `;
+            return;
+        }
+
+        const html = Object.entries(this.updates)
+            .sort(([a], [b]) => parseFloat(b) - parseFloat(a))
+            .map(([version, update]) => {
+                const isLatest = version === this.latestVersion;
+                return `
+                    <div class="update-item">
+                        <div class="update-header">
+                            <span class="version-badge ${isLatest ? 'latest' : ''}">
+                                v${version} ${isLatest ? '(Latest)' : ''}
+                            </span>
+                            <button class="delete-btn" onclick="updateManager.deleteUpdate('${version}')">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
+                        </div>
+                        <div class="update-details">
+                            <strong>${update.description}</strong><br>
+                            Size: ${update.file_size}
+                        </div>
+                        <div class="update-urls">
+                            ${update.script_url ? '<span class="url-badge">Script</span>' : ''}
+                            ${update.apk_url ? '<span class="url-badge apk">APK</span>' : ''}
+                        </div>
+                        ${update.changelog ? `
+                            <div class="changelog-list">
+                                <strong>Changelog:</strong>
+                                <ul>
+                                    ${update.changelog.map(item => `<li>${item}</li>`).join('')}
+                                </ul>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+
+        container.innerHTML = html;
+    }
+
+    deleteUpdate(version) {
+        if (confirm(`Are you sure you want to delete version ${version}?`)) {
+            delete this.updates[version];
+            this.latestVersion = this.getLatestVersion();
+            this.renderUpdates();
+            this.updateJSON();
+        }
+    }
+
+    updateJSON() {
+        const jsonData = {
+            latest_version: this.latestVersion,
+            updates: this.updates,
+            required_android_version: "21"
+        };
+
+        const formatted = JSON.stringify(jsonData, null, 2);
+        document.getElementById('jsonOutput').textContent = formatted;
+    }
+
+    updatePreview() {
+        const status = document.getElementById('previewStatus');
+        const updateBtn = document.getElementById('previewUpdateBtn');
+        
+        if (this.latestVersion) {
+            status.textContent = `Current version: 1.0`;
+            updateBtn.style.display = 'none';
+        } else {
+            status.textContent = 'No updates configured';
+            updateBtn.style.display = 'none';
+        }
+    }
+
+    copyJSON() {
+        const jsonText = document.getElementById('jsonOutput').textContent;
+        navigator.clipboard.writeText(jsonText).then(() => {
+            const btn = document.getElementById('copyJson');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+            btn.style.background = '#28a745';
+            
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.style.background = '#6c757d';
+            }, 2000);
+        }).catch(() => {
+            alert('Failed to copy to clipboard');
+        });
+    }
+
+    downloadJSON() {
+        const jsonText = document.getElementById('jsonOutput').textContent;
+        const blob = new Blob([jsonText], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'system_update.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    // Demo data for testing
+    loadDemo() {
+        this.updates = {
+            "1.1": {
+                "script_url": "https://raw.githubusercontent.com/alltechdev/alltech.dev/main/update_script_v1.sh",
+                "description": "Initial system update with security patches",
+                "file_size": "1.2MB",
+                "changelog": [
+                    "Security patches",
+                    "Performance improvements",
+                    "Bug fixes"
+                ]
+            },
+            "1.2": {
+                "script_url": "https://raw.githubusercontent.com/alltechdev/alltech.dev/main/update_script_v2.sh",
+                "apk_url": "https://github.com/alltechdev/alltech.dev/releases/download/v1.2/app.apk",
+                "description": "Major update with new features",
+                "file_size": "2.1MB",
+                "changelog": [
+                    "New APK installation support",
+                    "Improved UI",
+                    "Enhanced security",
+                    "Better error handling"
+                ]
+            }
+        };
+        this.latestVersion = this.getLatestVersion();
+        this.renderUpdates();
+        this.updateJSON();
+    }
+}
+
+// Initialize the application
+const updateManager = new UpdateManager();
+
+// Add demo button for testing
+document.addEventListener('DOMContentLoaded', () => {
+    // Add demo button to header
+    const header = document.querySelector('header');
+    const demoBtn = document.createElement('button');
+    demoBtn.className = 'btn-secondary';
+    demoBtn.innerHTML = '<i class="fas fa-flask"></i> Load Demo Data';
+    demoBtn.style.marginTop = '20px';
+    demoBtn.onclick = () => updateManager.loadDemo();
+    header.appendChild(demoBtn);
+});
