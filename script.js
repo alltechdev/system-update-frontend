@@ -532,19 +532,18 @@ class UpdateManager {
                 </div>
             `;
 
-            // Try to load devices from GitHub repository first
+            // Try to load devices from webhook first
             try {
-                const response = await fetch('https://api.github.com/repos/alltechdev/alltech.dev/contents/devices.json');
+                const response = await fetch('https://webhook.site/token/12345678-1234-1234-1234-123456789abc/requests?sorting=newest');
                 if (response.ok) {
-                    const data = await response.json();
-                    const content = atob(data.content);
-                    this.devices = JSON.parse(content);
-                    console.log('Loaded devices from GitHub:', this.devices);
+                    const webhookData = await response.json();
+                    this.devices = this.parseDevicesFromWebhook(webhookData.data || []);
+                    console.log('Loaded devices from webhook:', this.devices);
                 } else {
-                    throw new Error('devices.json not found in repository');
+                    throw new Error('Could not fetch from webhook');
                 }
-            } catch (githubError) {
-                console.log('Could not load from GitHub, checking localStorage:', githubError.message);
+            } catch (webhookError) {
+                console.log('Could not load from webhook, checking localStorage:', webhookError.message);
                 
                 // Fallback to localStorage 
                 const savedDevices = localStorage.getItem('registeredDevices');
@@ -553,7 +552,7 @@ class UpdateManager {
                     console.log('Loaded devices from localStorage:', this.devices);
                 } else {
                     this.devices = [];
-                    console.log('No devices found in localStorage');
+                    console.log('No devices found anywhere');
                 }
             }
             
@@ -626,6 +625,43 @@ class UpdateManager {
         container.innerHTML = html;
     }
     
+    parseDevicesFromWebhook(webhookRequests) {
+        const deviceMap = new Map();
+        
+        // Process webhook requests and extract device registrations
+        webhookRequests.forEach(request => {
+            try {
+                if (request.content && typeof request.content === 'string') {
+                    const content = JSON.parse(request.content);
+                    
+                    if (content.event === 'device_registration' || content.event === 'device_heartbeat') {
+                        const device = content.device;
+                        if (device && device.device_id) {
+                            // Use device_id as key to avoid duplicates, keep most recent
+                            if (!deviceMap.has(device.device_id) || 
+                                new Date(request.created_at) > new Date(deviceMap.get(device.device_id).last_webhook_seen)) {
+                                
+                                deviceMap.set(device.device_id, {
+                                    device_id: device.device_id,
+                                    brand: device.brand || 'Unknown',
+                                    model: device.model || 'Unknown',
+                                    android_version: device.android_version || 'Unknown',
+                                    app_version: device.app_version || '1.0',
+                                    last_seen: device.last_seen || request.created_at,
+                                    registration_time: device.registration_time || request.created_at,
+                                    last_webhook_seen: request.created_at
+                                });
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('Error parsing webhook request:', e);
+            }
+        });
+        
+        return Array.from(deviceMap.values());
+    }
 
     getTimeAgo(date) {
         const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
