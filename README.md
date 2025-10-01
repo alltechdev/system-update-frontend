@@ -68,7 +68,3 @@ Built with vanilla HTML, CSS, and JavaScript. No build process required.
 - `index.html` - Main interface
 - `styles.css` - Styling and responsive design
 - `script.js` - Update management logic
-
-## License
-
-MIT License - feel free to use and modify for your projects.
