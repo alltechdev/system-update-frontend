@@ -5,6 +5,9 @@ class UpdateManager {
         this.devices = [];
         this.jsonHistory = this.loadJsonHistory();
         this.githubSettings = this.loadGitHubSettings();
+        this.autoRefreshInterval = null;
+        this.autoRefreshEnabled = true;
+        this.refreshIntervalSeconds = 30; // Auto-refresh every 30 seconds
         this.init();
     }
 
@@ -14,8 +17,10 @@ class UpdateManager {
         this.setupButtons();
         this.setupSettings();
         this.setupDevices();
+        this.setupAutoRefresh();
         this.updateJSON();
         this.renderJsonHistory();
+        this.startAutoRefresh();
     }
 
     setupTabs() {
@@ -624,6 +629,117 @@ class UpdateManager {
         const regex = new RegExp(pattern);
         const match = body.match(regex);
         return match ? match[1].trim() : null;
+    }
+
+    setupAutoRefresh() {
+        // Add auto-refresh controls to the interface
+        const header = document.querySelector('header');
+        const autoRefreshDiv = document.createElement('div');
+        autoRefreshDiv.className = 'auto-refresh-controls';
+        autoRefreshDiv.innerHTML = `
+            <div style="margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 15px; font-size: 0.9rem;">
+                <label style="display: flex; align-items: center; gap: 5px;">
+                    <input type="checkbox" id="autoRefreshToggle" ${this.autoRefreshEnabled ? 'checked' : ''}>
+                    Auto-refresh
+                </label>
+                <span id="refreshStatus" style="color: #10b981;">●</span>
+                <span id="refreshTimer">Next refresh: ${this.refreshIntervalSeconds}s</span>
+                <button id="manualRefresh" style="padding: 4px 8px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    <i class="fas fa-sync-alt"></i> Refresh Now
+                </button>
+            </div>
+        `;
+        header.appendChild(autoRefreshDiv);
+
+        // Set up event listeners
+        document.getElementById('autoRefreshToggle').addEventListener('change', (e) => {
+            this.autoRefreshEnabled = e.target.checked;
+            if (this.autoRefreshEnabled) {
+                this.startAutoRefresh();
+            } else {
+                this.stopAutoRefresh();
+            }
+        });
+
+        document.getElementById('manualRefresh').addEventListener('click', () => {
+            this.performRefresh();
+        });
+    }
+
+    startAutoRefresh() {
+        if (!this.autoRefreshEnabled) return;
+        
+        this.stopAutoRefresh(); // Clear any existing interval
+        
+        let countdown = this.refreshIntervalSeconds;
+        const updateTimer = () => {
+            const timerElement = document.getElementById('refreshTimer');
+            if (timerElement) {
+                timerElement.textContent = `Next refresh: ${countdown}s`;
+            }
+            countdown--;
+            
+            if (countdown < 0) {
+                this.performRefresh();
+                countdown = this.refreshIntervalSeconds;
+            }
+        };
+
+        this.autoRefreshInterval = setInterval(updateTimer, 1000);
+        updateTimer(); // Initial call
+        
+        console.log('Auto-refresh started (every ' + this.refreshIntervalSeconds + ' seconds)');
+    }
+
+    stopAutoRefresh() {
+        if (this.autoRefreshInterval) {
+            clearInterval(this.autoRefreshInterval);
+            this.autoRefreshInterval = null;
+        }
+        
+        const timerElement = document.getElementById('refreshTimer');
+        if (timerElement) {
+            timerElement.textContent = 'Auto-refresh disabled';
+        }
+        
+        console.log('Auto-refresh stopped');
+    }
+
+    async performRefresh() {
+        const statusElement = document.getElementById('refreshStatus');
+        const manualButton = document.getElementById('manualRefresh');
+        
+        // Show refreshing state
+        if (statusElement) statusElement.style.color = '#f59e0b'; // Orange
+        if (manualButton) {
+            manualButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
+            manualButton.disabled = true;
+        }
+
+        try {
+            // Refresh devices if on devices tab
+            const activeTab = document.querySelector('.tab-content.active');
+            if (activeTab && activeTab.id === 'devices') {
+                await this.loadDevices();
+            }
+            
+            // Always update JSON output
+            this.updateJSON();
+            
+            // Show success state
+            if (statusElement) statusElement.style.color = '#10b981'; // Green
+            console.log('Auto-refresh completed successfully');
+            
+        } catch (error) {
+            console.error('Auto-refresh failed:', error);
+            if (statusElement) statusElement.style.color = '#ef4444'; // Red
+        } finally {
+            // Reset manual refresh button
+            if (manualButton) {
+                manualButton.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh Now';
+                manualButton.disabled = false;
+            }
+        }
     }
 }
 
