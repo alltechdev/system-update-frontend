@@ -2,6 +2,8 @@ class UpdateManager {
     constructor() {
         this.updates = {};
         this.latestVersion = '';
+        this.devices = [];
+        this.jsonHistory = this.loadJsonHistory();
         this.githubSettings = this.loadGitHubSettings();
         this.init();
     }
@@ -10,9 +12,10 @@ class UpdateManager {
         this.setupTabs();
         this.setupForm();
         this.setupButtons();
-        this.setupPreview();
         this.setupSettings();
+        this.setupDevices();
         this.updateJSON();
+        this.renderJsonHistory();
     }
 
     setupTabs() {
@@ -31,8 +34,8 @@ class UpdateManager {
                 
                 if (targetTab === 'json') {
                     this.updateJSON();
-                } else if (targetTab === 'preview') {
-                    this.updatePreview();
+                } else if (targetTab === 'devices') {
+                    this.loadDevices();
                 }
             });
         });
@@ -60,36 +63,6 @@ class UpdateManager {
         });
     }
 
-    setupPreview() {
-        const checkBtn = document.getElementById('previewCheckBtn');
-        const updateBtn = document.getElementById('previewUpdateBtn');
-        const status = document.getElementById('previewStatus');
-        const progress = document.getElementById('previewProgress');
-
-        checkBtn.addEventListener('click', () => {
-            if (this.latestVersion) {
-                status.textContent = `Update available: v${this.latestVersion}`;
-                updateBtn.style.display = 'inline-block';
-            } else {
-                status.textContent = 'No updates configured yet';
-            }
-        });
-
-        updateBtn.addEventListener('click', () => {
-            progress.style.display = 'block';
-            updateBtn.style.display = 'none';
-            status.textContent = 'Downloading update...';
-            
-            setTimeout(() => {
-                status.textContent = 'Installing update...';
-            }, 1500);
-            
-            setTimeout(() => {
-                status.textContent = 'Update completed successfully!';
-                progress.style.display = 'none';
-            }, 3000);
-        });
-    }
 
     addUpdate() {
         const version = document.getElementById('version').value;
@@ -205,20 +178,70 @@ class UpdateManager {
 
         const formatted = JSON.stringify(jsonData, null, 2);
         document.getElementById('jsonOutput').textContent = formatted;
+        
+        // Save to history
+        this.saveToJsonHistory(jsonData);
     }
 
-    updatePreview() {
-        const status = document.getElementById('previewStatus');
-        const updateBtn = document.getElementById('previewUpdateBtn');
+    loadJsonHistory() {
+        const saved = localStorage.getItem('jsonHistory');
+        return saved ? JSON.parse(saved) : [];
+    }
+
+    saveToJsonHistory(jsonData) {
+        const timestamp = new Date().toISOString();
+        const historyItem = {
+            timestamp,
+            data: jsonData,
+            id: Date.now()
+        };
         
-        if (this.latestVersion) {
-            status.textContent = `Current version: 1.0`;
-            updateBtn.style.display = 'none';
-        } else {
-            status.textContent = 'No updates configured';
-            updateBtn.style.display = 'none';
+        this.jsonHistory.unshift(historyItem);
+        // Keep only last 10 versions
+        if (this.jsonHistory.length > 10) {
+            this.jsonHistory = this.jsonHistory.slice(0, 10);
+        }
+        
+        localStorage.setItem('jsonHistory', JSON.stringify(this.jsonHistory));
+        this.renderJsonHistory();
+    }
+
+    renderJsonHistory() {
+        const container = document.getElementById('jsonHistory');
+        if (!container) return;
+        
+        if (this.jsonHistory.length === 0) {
+            container.innerHTML = '<p>No previous versions</p>';
+            return;
+        }
+
+        const html = this.jsonHistory.map(item => {
+            const date = new Date(item.timestamp);
+            const timeStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+            return `
+                <div class="history-item">
+                    <div class="history-header">
+                        <span class="history-time">${timeStr}</span>
+                        <span class="history-version">v${item.data.latest_version}</span>
+                        <button onclick="updateManager.restoreJson(${item.id})" class="btn-restore">Restore</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        container.innerHTML = html;
+    }
+
+    restoreJson(id) {
+        const item = this.jsonHistory.find(h => h.id === id);
+        if (item && confirm('Restore this version? Current changes will be lost.')) {
+            this.updates = item.data.updates;
+            this.latestVersion = item.data.latest_version;
+            this.renderUpdates();
+            this.updateJSON();
         }
     }
+
 
     copyJSON() {
         const jsonText = document.getElementById('jsonOutput').textContent;
@@ -458,19 +481,109 @@ class UpdateManager {
         this.renderUpdates();
         this.updateJSON();
     }
+
+    setupDevices() {
+        document.getElementById('refreshDevices').addEventListener('click', () => {
+            this.loadDevices();
+        });
+        
+        // Load devices initially
+        this.loadDevices();
+    }
+
+    async loadDevices() {
+        const container = document.getElementById('devicesList');
+        
+        try {
+            container.innerHTML = `
+                <div class="loading-state">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Loading devices...</p>
+                </div>
+            `;
+
+            const response = await fetch('http://localhost:8080/devices');
+            const data = await response.json();
+            
+            this.devices = data.devices || [];
+            this.renderDevices();
+            
+        } catch (error) {
+            console.error('Error loading devices:', error);
+            container.innerHTML = `
+                <div class="error-state">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>Failed to load devices. Make sure the device server is running on port 8080.</p>
+                    <button onclick="updateManager.loadDevices()" class="btn-secondary">
+                        <i class="fas fa-sync"></i> Retry
+                    </button>
+                </div>
+            `;
+        }
+    }
+
+    renderDevices() {
+        const container = document.getElementById('devicesList');
+        
+        if (this.devices.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-mobile-alt"></i>
+                    <p>No devices registered yet. Install and run the app on a device to see it here!</p>
+                </div>
+            `;
+            return;
+        }
+
+        const html = this.devices
+            .sort((a, b) => new Date(b.last_seen) - new Date(a.last_seen))
+            .map(device => {
+                const lastSeen = new Date(device.last_seen);
+                const timeAgo = this.getTimeAgo(lastSeen);
+                const isOnline = (Date.now() - lastSeen.getTime()) < 5 * 60 * 1000; // 5 minutes
+                
+                return `
+                    <div class="device-item">
+                        <div class="device-header">
+                            <div class="device-info">
+                                <span class="device-id">ID: ${device.device_id}</span>
+                                <span class="device-status ${isOnline ? 'online' : 'offline'}">
+                                    <i class="fas fa-circle"></i> ${isOnline ? 'Online' : 'Offline'}
+                                </span>
+                            </div>
+                            <div class="device-time">Last seen: ${timeAgo}</div>
+                        </div>
+                        <div class="device-details">
+                            <div class="device-spec">
+                                <i class="fas fa-mobile-alt"></i>
+                                <strong>${device.brand} ${device.model}</strong>
+                            </div>
+                            <div class="device-spec">
+                                <i class="fab fa-android"></i>
+                                Android ${device.android_version}
+                            </div>
+                            <div class="device-spec">
+                                <i class="fas fa-code-branch"></i>
+                                App v${device.app_version}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+        container.innerHTML = html;
+    }
+
+    getTimeAgo(date) {
+        const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+        
+        if (seconds < 60) return 'Just now';
+        if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+        if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+        return `${Math.floor(seconds / 86400)}d ago`;
+    }
 }
 
 // Initialize the application
 const updateManager = new UpdateManager();
 
-// Add demo button for testing
-document.addEventListener('DOMContentLoaded', () => {
-    // Add demo button to header
-    const header = document.querySelector('header');
-    const demoBtn = document.createElement('button');
-    demoBtn.className = 'btn-secondary';
-    demoBtn.innerHTML = '<i class="fas fa-flask"></i> Load Demo Data';
-    demoBtn.style.marginTop = '20px';
-    demoBtn.onclick = () => updateManager.loadDemo();
-    header.appendChild(demoBtn);
-});
