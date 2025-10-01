@@ -502,10 +502,31 @@ class UpdateManager {
                 </div>
             `;
 
-            const response = await fetch('http://localhost:8080/devices');
-            const data = await response.json();
+            const response = await fetch('https://api.github.com/repos/alltechdev/system-update-frontend/issues?labels=device-registration&state=open');
             
-            this.devices = data.devices || [];
+            if (response.ok) {
+                const issues = await response.json();
+                this.devices = issues.map(issue => {
+                    const body = issue.body;
+                    const deviceId = this.extractFromBody(body, 'Device ID: `([^`]+)`');
+                    const brand = this.extractFromBody(body, 'Brand: ([^\n]+)');
+                    const model = this.extractFromBody(body, 'Model: ([^\n]+)');
+                    const androidVersion = this.extractFromBody(body, 'Android Version: ([^\n]+)');
+                    const appVersion = this.extractFromBody(body, 'App Version: ([^\n]+)');
+                    
+                    return {
+                        device_id: deviceId || 'unknown',
+                        brand: brand || 'Unknown',
+                        model: model || 'Unknown',
+                        android_version: androidVersion || 'Unknown',
+                        app_version: appVersion || '1.0',
+                        last_seen: issue.updated_at,
+                        registration_time: issue.created_at
+                    };
+                });
+            } else {
+                this.devices = [];
+            }
             this.renderDevices();
             
         } catch (error) {
@@ -513,7 +534,7 @@ class UpdateManager {
             container.innerHTML = `
                 <div class="error-state">
                     <i class="fas fa-exclamation-triangle"></i>
-                    <p>Failed to load devices. Make sure the device server is running on port 8080.</p>
+                    <p>Failed to load devices. Device registration will be available when devices.json is created.</p>
                     <button onclick="updateManager.loadDevices()" class="btn-secondary">
                         <i class="fas fa-sync"></i> Retry
                     </button>
@@ -581,6 +602,12 @@ class UpdateManager {
         if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
         if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
         return `${Math.floor(seconds / 86400)}d ago`;
+    }
+
+    extractFromBody(body, pattern) {
+        const regex = new RegExp(pattern);
+        const match = body.match(regex);
+        return match ? match[1].trim() : null;
     }
 }
 
