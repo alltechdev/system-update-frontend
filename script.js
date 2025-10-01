@@ -16,7 +16,6 @@ class UpdateManager {
         this.setupForm();
         this.setupButtons();
         this.setupSettings();
-        this.setupDevices();
         this.setupAutoRefresh();
         this.updateJSON();
         this.renderJsonHistory();
@@ -39,8 +38,6 @@ class UpdateManager {
                 
                 if (targetTab === 'json') {
                     this.updateJSON();
-                } else if (targetTab === 'devices') {
-                    this.loadDevices();
                 }
             });
         });
@@ -51,24 +48,6 @@ class UpdateManager {
         form.addEventListener('submit', (e) => {
             e.preventDefault();
             this.addUpdate();
-        });
-        
-        // Setup device targeting radio buttons
-        const targetAllRadio = document.getElementById('targetAll');
-        const targetSpecificRadio = document.getElementById('targetSpecific');
-        const deviceSelector = document.getElementById('deviceSelector');
-        
-        targetAllRadio.addEventListener('change', () => {
-            if (targetAllRadio.checked) {
-                deviceSelector.style.display = 'none';
-            }
-        });
-        
-        targetSpecificRadio.addEventListener('change', () => {
-            if (targetSpecificRadio.checked) {
-                deviceSelector.style.display = 'block';
-                this.loadDevicesForTargeting();
-            }
         });
     }
 
@@ -84,6 +63,10 @@ class UpdateManager {
         document.getElementById('syncToGitHub').addEventListener('click', () => {
             this.syncToGitHub();
         });
+
+        document.getElementById('uploadConfig').addEventListener('click', () => {
+            this.uploadConfiguration();
+        });
     }
 
 
@@ -96,7 +79,6 @@ class UpdateManager {
         const changelog = document.getElementById('changelog').value;
         const forced = document.getElementById('forced').checked;
         const automatic = document.getElementById('automatic').checked;
-        const targetingMode = document.querySelector('input[name="targeting"]:checked').value;
 
         if (!version) {
             alert('Version number is required');
@@ -116,17 +98,6 @@ class UpdateManager {
             automatic: automatic
         };
 
-        // Add device targeting
-        if (targetingMode === 'specific') {
-            const selectedDevices = this.getSelectedDevices();
-            if (selectedDevices.length === 0) {
-                alert('Please select at least one device for targeted update.');
-                return;
-            }
-            update.target_devices = selectedDevices;
-        }
-        // If targetingMode is 'all', we don't add target_devices (means all devices)
-
         if (scriptUrl) update.script_url = scriptUrl;
         if (apkUrl) update.apk_url = apkUrl;
 
@@ -142,8 +113,6 @@ class UpdateManager {
         this.renderUpdates();
         this.updateJSON();
         document.getElementById('updateForm').reset();
-        document.getElementById('deviceSelector').style.display = 'none';
-        document.getElementById('targetAll').checked = true;
     }
 
     getLatestVersion() {
@@ -193,7 +162,6 @@ class UpdateManager {
                             ${update.apk_url ? '<span class="url-badge apk">APK</span>' : ''}
                             ${update.forced ? '<span class="url-badge forced">FORCED</span>' : ''}
                             ${update.automatic ? '<span class="url-badge automatic">AUTO</span>' : ''}
-                            ${update.target_devices ? `<span class="url-badge targeted">TARGETED (${update.target_devices.length})</span>` : ''}
                         </div>
                         ${update.changelog ? `
                             <div class="changelog-list">
@@ -322,6 +290,46 @@ class UpdateManager {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+    }
+
+    uploadConfiguration() {
+        const input = document.getElementById('configFileInput');
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const config = JSON.parse(e.target.result);
+                        this.loadConfiguration(config);
+                    } catch (error) {
+                        alert('Invalid JSON file. Please select a valid configuration file.');
+                    }
+                };
+                reader.readAsText(file);
+            }
+        };
+        input.click();
+    }
+
+    loadConfiguration(config) {
+        try {
+            if (config.updates) {
+                this.updates = config.updates;
+            }
+            if (config.latest_version) {
+                this.latestVersion = config.latest_version;
+            } else {
+                this.latestVersion = this.getLatestVersion();
+            }
+            
+            this.renderUpdates();
+            this.updateJSON();
+            
+            alert('Configuration loaded successfully!');
+        } catch (error) {
+            alert('Error loading configuration: ' + error.message);
+        }
     }
 
     setupSettings() {
@@ -536,192 +544,6 @@ class UpdateManager {
         this.updateJSON();
     }
 
-    setupDevices() {
-        document.getElementById('refreshDevices').addEventListener('click', () => {
-            this.loadDevices();
-        });
-        
-        // Clear any existing test devices
-        this.clearTestDevices();
-        
-        // Load devices initially
-        this.loadDevices();
-    }
-    
-    clearTestDevices() {
-        // Clear localStorage to remove any test devices
-        localStorage.removeItem('registeredDevices');
-        console.log('Cleared test devices from localStorage');
-    }
-
-    async loadDevices() {
-        const container = document.getElementById('devicesList');
-        
-        try {
-            container.innerHTML = `
-                <div class="loading-state">
-                    <i class="fas fa-spinner fa-spin"></i>
-                    <p>Loading devices from GitHub...</p>
-                </div>
-            `;
-
-            // Load devices from GitHub devices.json
-            this.devices = await this.fetchDevicesFromGitHub();
-            
-            this.renderDevices();
-            
-        } catch (error) {
-            console.error('Error loading devices:', error);
-            this.devices = [];
-            container.innerHTML = `
-                <div class="error-state">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <p>Error loading devices: ${error.message}</p>
-                    <p>Devices will appear here once the Android app is installed and running.</p>
-                    <button onclick="updateManager.loadDevices()" class="btn-secondary">
-                        <i class="fas fa-sync"></i> Retry
-                    </button>
-                </div>
-            `;
-        }
-    }
-    
-    async fetchDevicesFromGitHub() {
-        try {
-            const response = await fetch('https://api.github.com/repos/alltechdev/alltech.dev/contents/devices.json');
-            
-            if (!response.ok) {
-                if (response.status === 404) {
-                    console.log('devices.json not found, returning empty array');
-                    return [];
-                }
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-            
-            const fileData = await response.json();
-            const content = fileData.content;
-            const decodedContent = atob(content);
-            
-            const devicesData = JSON.parse(decodedContent);
-            
-            if (devicesData.devices && Array.isArray(devicesData.devices)) {
-                console.log(`Loaded ${devicesData.devices.length} devices from GitHub`);
-                return devicesData.devices;
-            } else {
-                console.log('No devices array found in devices.json');
-                return [];
-            }
-            
-        } catch (error) {
-            console.error('Error fetching devices from GitHub:', error);
-            throw error;
-        }
-    }
-
-    renderDevices() {
-        const container = document.getElementById('devicesList');
-        
-        if (this.devices.length === 0) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-mobile-alt"></i>
-                    <p>No devices registered yet. Install and run the app on a device to see it here!</p>
-                </div>
-            `;
-            return;
-        }
-
-        const html = this.devices
-            .sort((a, b) => new Date(b.last_seen) - new Date(a.last_seen))
-            .map(device => {
-                const lastSeen = new Date(device.last_seen);
-                const timeAgo = this.getTimeAgo(lastSeen);
-                const isOnline = (Date.now() - lastSeen.getTime()) < 5 * 60 * 1000; // 5 minutes
-                
-                return `
-                    <div class="device-item">
-                        <div class="device-header">
-                            <div class="device-info">
-                                <span class="device-id">ID: ${device.device_id}</span>
-                                <span class="device-status ${isOnline ? 'online' : 'offline'}">
-                                    <i class="fas fa-circle"></i> ${isOnline ? 'Online' : 'Offline'}
-                                </span>
-                            </div>
-                            <div class="device-time">Last seen: ${timeAgo}</div>
-                        </div>
-                        <div class="device-details">
-                            <div class="device-spec">
-                                <i class="fas fa-mobile-alt"></i>
-                                <strong>${device.brand} ${device.model}</strong>
-                            </div>
-                            <div class="device-spec">
-                                <i class="fab fa-android"></i>
-                                Android ${device.android_version}
-                            </div>
-                            <div class="device-spec">
-                                <i class="fas fa-code-branch"></i>
-                                App v${device.app_version}
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-
-        container.innerHTML = html;
-    }
-    
-    parseDevicesFromWebhook(webhookRequests) {
-        const deviceMap = new Map();
-        
-        // Process webhook requests and extract device registrations
-        webhookRequests.forEach(request => {
-            try {
-                if (request.content && typeof request.content === 'string') {
-                    const content = JSON.parse(request.content);
-                    
-                    if (content.event === 'device_registration' || content.event === 'device_heartbeat') {
-                        const device = content.device;
-                        if (device && device.device_id) {
-                            // Use device_id as key to avoid duplicates, keep most recent
-                            if (!deviceMap.has(device.device_id) || 
-                                new Date(request.created_at) > new Date(deviceMap.get(device.device_id).last_webhook_seen)) {
-                                
-                                deviceMap.set(device.device_id, {
-                                    device_id: device.device_id,
-                                    brand: device.brand || 'Unknown',
-                                    model: device.model || 'Unknown',
-                                    android_version: device.android_version || 'Unknown',
-                                    app_version: device.app_version || '1.0',
-                                    last_seen: device.last_seen || request.created_at,
-                                    registration_time: device.registration_time || request.created_at,
-                                    last_webhook_seen: request.created_at
-                                });
-                            }
-                        }
-                    }
-                }
-            } catch (e) {
-                console.warn('Error parsing webhook request:', e);
-            }
-        });
-        
-        return Array.from(deviceMap.values());
-    }
-
-    getTimeAgo(date) {
-        const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-        
-        if (seconds < 60) return 'Just now';
-        if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-        if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-        return `${Math.floor(seconds / 86400)}d ago`;
-    }
-
-    extractFromBody(body, pattern) {
-        const regex = new RegExp(pattern);
-        const match = body.match(regex);
-        return match ? match[1].trim() : null;
-    }
 
     setupAutoRefresh() {
         // Add auto-refresh controls to the interface
@@ -834,48 +656,6 @@ class UpdateManager {
         }
     }
     
-    async loadDevicesForTargeting() {
-        const container = document.getElementById('deviceCheckboxes');
-        
-        try {
-            container.innerHTML = '<p class="loading-text">Loading devices...</p>';
-            
-            // Use the same device loading method
-            const devices = await this.fetchDevicesFromGitHub();
-            
-            if (devices.length === 0) {
-                container.innerHTML = '<p class="loading-text">No devices registered yet. Install the app on devices first.</p>';
-                return;
-            }
-            
-            const html = devices.map(device => {
-                const deviceId = device.device_id;
-                const deviceName = `${device.brand} ${device.model}`;
-                const deviceDetails = `Android ${device.android_version} • App v${device.app_version}`;
-                
-                return `
-                    <div class="device-checkbox-item">
-                        <input type="checkbox" id="device_${deviceId}" value="${deviceId}">
-                        <div class="device-info">
-                            <div class="device-name">${deviceName}</div>
-                            <div class="device-details">${deviceDetails}</div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-            
-            container.innerHTML = html;
-            
-        } catch (error) {
-            console.error('Error loading devices for targeting:', error);
-            container.innerHTML = '<p class="loading-text">Error loading devices. Please try again.</p>';
-        }
-    }
-    
-    getSelectedDevices() {
-        const checkboxes = document.querySelectorAll('#deviceCheckboxes input[type="checkbox"]:checked');
-        return Array.from(checkboxes).map(cb => cb.value);
-    }
 }
 
 // Initialize the application

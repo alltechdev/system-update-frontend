@@ -16,7 +16,6 @@
 
         <div class="tabs">
             <button class="tab-button active" data-tab="updates">Updates</button>
-            <button class="tab-button" data-tab="devices">Devices</button>
             <button class="tab-button" data-tab="json">JSON Output</button>
             <button class="tab-button" data-tab="settings">Settings</button>
         </div>
@@ -73,28 +72,6 @@
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label>Device Targeting</label>
-                        <div class="targeting-options">
-                            <label class="radio-label">
-                                <input type="radio" name="targeting" value="all" id="targetAll" checked>
-                                <span class="radio-text">
-                                    <strong>All Devices</strong> - Send to all registered devices
-                                </span>
-                            </label>
-                            <label class="radio-label">
-                                <input type="radio" name="targeting" value="specific" id="targetSpecific">
-                                <span class="radio-text">
-                                    <strong>Specific Devices</strong> - Choose which devices to update
-                                </span>
-                            </label>
-                        </div>
-                        <div id="deviceSelector" class="device-selector" style="display: none;">
-                            <div id="deviceCheckboxes" class="device-checkboxes">
-                                <p class="loading-text">Loading devices...</p>
-                            </div>
-                        </div>
-                    </div>
 
                     <button type="submit" class="btn-primary">
                         <i class="fas fa-plus"></i> Add Update
@@ -113,22 +90,6 @@
             </div>
         </div>
 
-        <div id="devices" class="tab-content">
-            <div class="card">
-                <h2><i class="fas fa-mobile-alt"></i> Registered Devices</h2>
-                <div class="device-actions">
-                    <button id="refreshDevices" class="btn-secondary">
-                        <i class="fas fa-sync"></i> Refresh
-                    </button>
-                </div>
-                <div id="devicesList" class="devices-list">
-                    <div class="loading-state">
-                        <i class="fas fa-spinner fa-spin"></i>
-                        <p>Loading devices...</p>
-                    </div>
-                </div>
-            </div>
-        </div>
 
         <div id="json" class="tab-content">
             <div class="card">
@@ -140,10 +101,14 @@
                     <button id="downloadJson" class="btn-secondary">
                         <i class="fas fa-download"></i> Download
                     </button>
+                    <button id="uploadConfig" class="btn-secondary">
+                        <i class="fas fa-upload"></i> Upload Config
+                    </button>
                     <button id="syncToGitHub" class="btn-primary">
                         <i class="fas fa-sync"></i> Sync to GitHub
                     </button>
                 </div>
+                <input type="file" id="configFileInput" accept=".json" style="display: none;">
                 <div id="syncStatus" class="sync-status"></div>
                 <pre id="jsonOutput" class="json-output">
 {
