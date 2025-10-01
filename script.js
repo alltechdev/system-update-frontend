@@ -508,12 +508,17 @@ class UpdateManager {
             this.loadDevices();
         });
         
-        document.getElementById('addTestDevice').addEventListener('click', () => {
-            this.addTestDevice();
-        });
+        // Clear any existing test devices
+        this.clearTestDevices();
         
         // Load devices initially
         this.loadDevices();
+    }
+    
+    clearTestDevices() {
+        // Clear localStorage to remove any test devices
+        localStorage.removeItem('registeredDevices');
+        console.log('Cleared test devices from localStorage');
     }
 
     async loadDevices() {
@@ -527,44 +532,40 @@ class UpdateManager {
                 </div>
             `;
 
-            // Load devices from localStorage (local demo data)
-            const savedDevices = localStorage.getItem('registeredDevices');
-            if (savedDevices) {
-                this.devices = JSON.parse(savedDevices);
-            } else {
-                // Create some sample devices for demonstration
-                this.devices = [
-                    {
-                        device_id: '1a2b3c4d',
-                        brand: 'Samsung',
-                        model: 'Galaxy A12',
-                        android_version: '12',
-                        app_version: '1.0',
-                        last_seen: new Date(Date.now() - 300000).toISOString(), // 5 minutes ago
-                        registration_time: new Date(Date.now() - 86400000).toISOString() // 1 day ago
-                    },
-                    {
-                        device_id: '5e6f7g8h',
-                        brand: 'Xiaomi',
-                        model: 'Redmi Note 10',
-                        android_version: '11',
-                        app_version: '1.0',
-                        last_seen: new Date(Date.now() - 120000).toISOString(), // 2 minutes ago
-                        registration_time: new Date(Date.now() - 172800000).toISOString() // 2 days ago
-                    }
-                ];
-                // Save sample data
-                localStorage.setItem('registeredDevices', JSON.stringify(this.devices));
+            // Try to load devices from GitHub repository first
+            try {
+                const response = await fetch('https://api.github.com/repos/alltechdev/alltech.dev/contents/devices.json');
+                if (response.ok) {
+                    const data = await response.json();
+                    const content = atob(data.content);
+                    this.devices = JSON.parse(content);
+                    console.log('Loaded devices from GitHub:', this.devices);
+                } else {
+                    throw new Error('devices.json not found in repository');
+                }
+            } catch (githubError) {
+                console.log('Could not load from GitHub, checking localStorage:', githubError.message);
+                
+                // Fallback to localStorage 
+                const savedDevices = localStorage.getItem('registeredDevices');
+                if (savedDevices) {
+                    this.devices = JSON.parse(savedDevices);
+                    console.log('Loaded devices from localStorage:', this.devices);
+                } else {
+                    this.devices = [];
+                    console.log('No devices found in localStorage');
+                }
             }
             
             this.renderDevices();
             
         } catch (error) {
             console.error('Error loading devices:', error);
+            this.devices = [];
             container.innerHTML = `
                 <div class="error-state">
                     <i class="fas fa-exclamation-triangle"></i>
-                    <p>Failed to load devices from local storage.</p>
+                    <p>No registered devices found. Devices will appear here once the Android app is installed and running.</p>
                     <button onclick="updateManager.loadDevices()" class="btn-secondary">
                         <i class="fas fa-sync"></i> Retry
                     </button>
@@ -625,32 +626,6 @@ class UpdateManager {
         container.innerHTML = html;
     }
     
-    addTestDevice() {
-        const brands = ['Samsung', 'Xiaomi', 'OnePlus', 'Google', 'Huawei', 'Oppo', 'Vivo', 'LG'];
-        const models = ['Galaxy A52', 'Redmi Note 11', 'Nord 2', 'Pixel 6', 'P50', 'A95', 'V23', 'G8'];
-        const androidVersions = ['11', '12', '13', '14'];
-        
-        const randomBrand = brands[Math.floor(Math.random() * brands.length)];
-        const randomModel = models[Math.floor(Math.random() * models.length)];
-        const randomAndroid = androidVersions[Math.floor(Math.random() * androidVersions.length)];
-        const randomDeviceId = Math.random().toString(36).substring(2, 10);
-        
-        const newDevice = {
-            device_id: randomDeviceId,
-            brand: randomBrand,
-            model: randomModel,
-            android_version: randomAndroid,
-            app_version: '1.0',
-            last_seen: new Date().toISOString(),
-            registration_time: new Date().toISOString()
-        };
-        
-        this.devices.push(newDevice);
-        localStorage.setItem('registeredDevices', JSON.stringify(this.devices));
-        this.renderDevices();
-        
-        console.log('Test device added:', newDevice);
-    }
 
     getTimeAgo(date) {
         const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
