@@ -71,15 +71,25 @@ class UpdateManager {
         const apkUrl = document.getElementById('apkUrl').value;
         const fileSize = document.getElementById('fileSize').value;
         const changelog = document.getElementById('changelog').value;
+        const forced = document.getElementById('forced').checked;
+        const automatic = document.getElementById('automatic').checked;
 
         if (!version) {
             alert('Version number is required');
             return;
         }
 
+        // Validation: automatic and forced cannot both be true
+        if (forced && automatic) {
+            alert('Update cannot be both forced and automatic. Please choose one option.');
+            return;
+        }
+
         const update = {
             description: description || `System update v${version}`,
-            file_size: fileSize || '1.0MB'
+            file_size: fileSize || '1.0MB',
+            forced: forced,
+            automatic: automatic
         };
 
         if (scriptUrl) update.script_url = scriptUrl;
@@ -144,6 +154,8 @@ class UpdateManager {
                         <div class="update-urls">
                             ${update.script_url ? '<span class="url-badge">Script</span>' : ''}
                             ${update.apk_url ? '<span class="url-badge apk">APK</span>' : ''}
+                            ${update.forced ? '<span class="url-badge forced">FORCED</span>' : ''}
+                            ${update.automatic ? '<span class="url-badge automatic">AUTO</span>' : ''}
                         </div>
                         ${update.changelog ? `
                             <div class="changelog-list">
@@ -458,6 +470,8 @@ class UpdateManager {
                 "script_url": "https://raw.githubusercontent.com/alltechdev/alltech.dev/main/update_script_v1.sh",
                 "description": "Initial system update with security patches",
                 "file_size": "1.2MB",
+                "forced": false,
+                "automatic": false,
                 "changelog": [
                     "Security patches",
                     "Performance improvements",
@@ -469,6 +483,8 @@ class UpdateManager {
                 "apk_url": "https://github.com/alltechdev/alltech.dev/releases/download/v1.2/app.apk",
                 "description": "Major update with new features",
                 "file_size": "2.1MB",
+                "forced": false,
+                "automatic": false,
                 "changelog": [
                     "New APK installation support",
                     "Improved UI",

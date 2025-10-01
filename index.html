@@ -55,6 +55,24 @@
                         <textarea id="changelog" rows="4" placeholder="• Bug fixes&#10;• New features&#10;• Performance improvements"></textarea>
                     </div>
 
+                    <div class="form-group">
+                        <label>Update Behavior</label>
+                        <div class="checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="forced">
+                                <span class="checkbox-text">
+                                    <strong>Forced Update</strong> - Users cannot skip this update
+                                </span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="automatic">
+                                <span class="checkbox-text">
+                                    <strong>Automatic Update</strong> - Install immediately without user confirmation
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+
                     <button type="submit" class="btn-primary">
                         <i class="fas fa-plus"></i> Add Update
                     </button>
