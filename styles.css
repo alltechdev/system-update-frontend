@@ -259,6 +259,11 @@ header p {
     font-weight: bold;
 }
 
+.url-badge.targeted {
+    background: #7c3aed;
+    font-weight: bold;
+}
+
 .changelog-list {
     margin-top: 10px;
 }
@@ -491,6 +496,107 @@ footer a:hover {
     color: #f1f5f9;
     display: block;
     margin-bottom: 2px;
+}
+
+/* Device Targeting Styles */
+.targeting-options {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-bottom: 16px;
+}
+
+.radio-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    cursor: pointer;
+    padding: 12px;
+    border-radius: 8px;
+    background: #1e293b;
+    border: 1px solid #475569;
+    transition: all 0.3s ease;
+}
+
+.radio-label:hover {
+    background: #2d3748;
+    border-color: #3b82f6;
+}
+
+.radio-label input[type="radio"] {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    cursor: pointer;
+    accent-color: #3b82f6;
+}
+
+.radio-text {
+    flex: 1;
+    line-height: 1.4;
+}
+
+.radio-text strong {
+    color: #f1f5f9;
+    display: block;
+    margin-bottom: 2px;
+}
+
+.device-selector {
+    margin-top: 16px;
+    padding: 16px;
+    background: rgba(15, 23, 42, 0.5);
+    border-radius: 8px;
+    border: 1px solid #334155;
+}
+
+.device-checkboxes {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.device-checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    background: rgba(30, 41, 59, 0.6);
+    border-radius: 6px;
+    border: 1px solid #475569;
+    transition: all 0.2s;
+}
+
+.device-checkbox-item:hover {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: #60a5fa;
+}
+
+.device-checkbox-item input[type="checkbox"] {
+    margin: 0;
+    accent-color: #3b82f6;
+}
+
+.device-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.device-name {
+    font-weight: 500;
+    color: #f1f5f9;
+}
+
+.device-details {
+    font-size: 0.85rem;
+    color: #94a3b8;
+}
+
+.loading-text {
+    text-align: center;
+    color: #94a3b8;
+    font-style: italic;
 }
 
 .sync-status,

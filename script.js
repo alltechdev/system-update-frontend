@@ -52,6 +52,24 @@ class UpdateManager {
             e.preventDefault();
             this.addUpdate();
         });
+        
+        // Setup device targeting radio buttons
+        const targetAllRadio = document.getElementById('targetAll');
+        const targetSpecificRadio = document.getElementById('targetSpecific');
+        const deviceSelector = document.getElementById('deviceSelector');
+        
+        targetAllRadio.addEventListener('change', () => {
+            if (targetAllRadio.checked) {
+                deviceSelector.style.display = 'none';
+            }
+        });
+        
+        targetSpecificRadio.addEventListener('change', () => {
+            if (targetSpecificRadio.checked) {
+                deviceSelector.style.display = 'block';
+                this.loadDevicesForTargeting();
+            }
+        });
     }
 
     setupButtons() {
@@ -78,6 +96,7 @@ class UpdateManager {
         const changelog = document.getElementById('changelog').value;
         const forced = document.getElementById('forced').checked;
         const automatic = document.getElementById('automatic').checked;
+        const targetingMode = document.querySelector('input[name="targeting"]:checked').value;
 
         if (!version) {
             alert('Version number is required');
@@ -97,6 +116,17 @@ class UpdateManager {
             automatic: automatic
         };
 
+        // Add device targeting
+        if (targetingMode === 'specific') {
+            const selectedDevices = this.getSelectedDevices();
+            if (selectedDevices.length === 0) {
+                alert('Please select at least one device for targeted update.');
+                return;
+            }
+            update.target_devices = selectedDevices;
+        }
+        // If targetingMode is 'all', we don't add target_devices (means all devices)
+
         if (scriptUrl) update.script_url = scriptUrl;
         if (apkUrl) update.apk_url = apkUrl;
 
@@ -112,6 +142,8 @@ class UpdateManager {
         this.renderUpdates();
         this.updateJSON();
         document.getElementById('updateForm').reset();
+        document.getElementById('deviceSelector').style.display = 'none';
+        document.getElementById('targetAll').checked = true;
     }
 
     getLatestVersion() {
@@ -161,6 +193,7 @@ class UpdateManager {
                             ${update.apk_url ? '<span class="url-badge apk">APK</span>' : ''}
                             ${update.forced ? '<span class="url-badge forced">FORCED</span>' : ''}
                             ${update.automatic ? '<span class="url-badge automatic">AUTO</span>' : ''}
+                            ${update.target_devices ? `<span class="url-badge targeted">TARGETED (${update.target_devices.length})</span>` : ''}
                         </div>
                         ${update.changelog ? `
                             <div class="changelog-list">
@@ -799,6 +832,49 @@ class UpdateManager {
                 manualButton.disabled = false;
             }
         }
+    }
+    
+    async loadDevicesForTargeting() {
+        const container = document.getElementById('deviceCheckboxes');
+        
+        try {
+            container.innerHTML = '<p class="loading-text">Loading devices...</p>';
+            
+            // Use the same device loading method
+            const devices = await this.fetchDevicesFromGitHub();
+            
+            if (devices.length === 0) {
+                container.innerHTML = '<p class="loading-text">No devices registered yet. Install the app on devices first.</p>';
+                return;
+            }
+            
+            const html = devices.map(device => {
+                const deviceId = device.device_id;
+                const deviceName = `${device.brand} ${device.model}`;
+                const deviceDetails = `Android ${device.android_version} • App v${device.app_version}`;
+                
+                return `
+                    <div class="device-checkbox-item">
+                        <input type="checkbox" id="device_${deviceId}" value="${deviceId}">
+                        <div class="device-info">
+                            <div class="device-name">${deviceName}</div>
+                            <div class="device-details">${deviceDetails}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            container.innerHTML = html;
+            
+        } catch (error) {
+            console.error('Error loading devices for targeting:', error);
+            container.innerHTML = '<p class="loading-text">Error loading devices. Please try again.</p>';
+        }
+    }
+    
+    getSelectedDevices() {
+        const checkboxes = document.querySelectorAll('#deviceCheckboxes input[type="checkbox"]:checked');
+        return Array.from(checkboxes).map(cb => cb.value);
     }
 }
 
