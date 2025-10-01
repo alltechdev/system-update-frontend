@@ -528,35 +528,12 @@ class UpdateManager {
             container.innerHTML = `
                 <div class="loading-state">
                     <i class="fas fa-spinner fa-spin"></i>
-                    <p>Loading devices...</p>
+                    <p>Loading devices from GitHub...</p>
                 </div>
             `;
 
-            // For now, show a simple message about device registration
-            this.devices = [];
-            
-            // Try to load any existing devices from localStorage for debugging
-            const savedDevices = localStorage.getItem('registeredDevices');
-            if (savedDevices) {
-                this.devices = JSON.parse(savedDevices);
-                console.log('Loaded devices from localStorage:', this.devices);
-            }
-            
-            // Add a temporary debug device to show the interface is working
-            if (this.devices.length === 0) {
-                const debugDevice = {
-                    device_id: 'debug-device',
-                    brand: 'Debug',
-                    model: 'Test Device',
-                    android_version: '12',
-                    app_version: '1.0',
-                    last_seen: new Date().toISOString(),
-                    registration_time: new Date().toISOString(),
-                    is_debug: true
-                };
-                this.devices.push(debugDevice);
-                console.log('Added debug device for testing interface');
-            }
+            // Load devices from GitHub devices.json
+            this.devices = await this.fetchDevicesFromGitHub();
             
             this.renderDevices();
             
@@ -566,12 +543,45 @@ class UpdateManager {
             container.innerHTML = `
                 <div class="error-state">
                     <i class="fas fa-exclamation-triangle"></i>
-                    <p>No registered devices found. Devices will appear here once the Android app is installed and running.</p>
+                    <p>Error loading devices: ${error.message}</p>
+                    <p>Devices will appear here once the Android app is installed and running.</p>
                     <button onclick="updateManager.loadDevices()" class="btn-secondary">
                         <i class="fas fa-sync"></i> Retry
                     </button>
                 </div>
             `;
+        }
+    }
+    
+    async fetchDevicesFromGitHub() {
+        try {
+            const response = await fetch('https://api.github.com/repos/alltechdev/alltech.dev/contents/devices.json');
+            
+            if (!response.ok) {
+                if (response.status === 404) {
+                    console.log('devices.json not found, returning empty array');
+                    return [];
+                }
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const fileData = await response.json();
+            const content = fileData.content;
+            const decodedContent = atob(content);
+            
+            const devicesData = JSON.parse(decodedContent);
+            
+            if (devicesData.devices && Array.isArray(devicesData.devices)) {
+                console.log(`Loaded ${devicesData.devices.length} devices from GitHub`);
+                return devicesData.devices;
+            } else {
+                console.log('No devices array found in devices.json');
+                return [];
+            }
+            
+        } catch (error) {
+            console.error('Error fetching devices from GitHub:', error);
+            throw error;
         }
     }
 
