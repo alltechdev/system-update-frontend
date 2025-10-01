@@ -532,28 +532,30 @@ class UpdateManager {
                 </div>
             `;
 
-            // Try to load devices from webhook first
-            try {
-                const response = await fetch('https://webhook.site/token/12345678-1234-1234-1234-123456789abc/requests?sorting=newest');
-                if (response.ok) {
-                    const webhookData = await response.json();
-                    this.devices = this.parseDevicesFromWebhook(webhookData.data || []);
-                    console.log('Loaded devices from webhook:', this.devices);
-                } else {
-                    throw new Error('Could not fetch from webhook');
-                }
-            } catch (webhookError) {
-                console.log('Could not load from webhook, checking localStorage:', webhookError.message);
-                
-                // Fallback to localStorage 
-                const savedDevices = localStorage.getItem('registeredDevices');
-                if (savedDevices) {
-                    this.devices = JSON.parse(savedDevices);
-                    console.log('Loaded devices from localStorage:', this.devices);
-                } else {
-                    this.devices = [];
-                    console.log('No devices found anywhere');
-                }
+            // For now, show a simple message about device registration
+            this.devices = [];
+            
+            // Try to load any existing devices from localStorage for debugging
+            const savedDevices = localStorage.getItem('registeredDevices');
+            if (savedDevices) {
+                this.devices = JSON.parse(savedDevices);
+                console.log('Loaded devices from localStorage:', this.devices);
+            }
+            
+            // Add a temporary debug device to show the interface is working
+            if (this.devices.length === 0) {
+                const debugDevice = {
+                    device_id: 'debug-device',
+                    brand: 'Debug',
+                    model: 'Test Device',
+                    android_version: '12',
+                    app_version: '1.0',
+                    last_seen: new Date().toISOString(),
+                    registration_time: new Date().toISOString(),
+                    is_debug: true
+                };
+                this.devices.push(debugDevice);
+                console.log('Added debug device for testing interface');
             }
             
             this.renderDevices();
