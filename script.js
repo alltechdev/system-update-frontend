@@ -300,28 +300,64 @@ class UpdateManager {
     }
 
     async testGitHubConnection() {
-        if (!this.githubSettings.token) {
+        console.log('Testing GitHub connection...');
+        
+        // Get current values from form, not saved settings
+        const token = document.getElementById('githubToken').value.trim();
+        const owner = document.getElementById('repoOwner').value.trim();
+        const repo = document.getElementById('repoName').value.trim();
+        
+        console.log('Token length:', token.length);
+        console.log('Owner:', owner);
+        console.log('Repo:', repo);
+        
+        if (!token) {
             this.showStatus('connectionStatus', 'Please enter a GitHub token first', 'error');
+            return;
+        }
+
+        if (!owner || !repo) {
+            this.showStatus('connectionStatus', 'Please enter repository owner and name', 'error');
             return;
         }
 
         this.showStatus('connectionStatus', 'Testing connection...', 'loading');
 
         try {
-            const response = await fetch(`https://api.github.com/repos/${this.githubSettings.owner}/${this.githubSettings.repo}`, {
+            const url = `https://api.github.com/repos/${owner}/${repo}`;
+            console.log('Testing URL:', url);
+            
+            const response = await fetch(url, {
                 headers: {
-                    'Authorization': `token ${this.githubSettings.token}`,
-                    'Accept': 'application/vnd.github.v3+json'
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'User-Agent': 'System-Update-Manager'
                 }
             });
 
+            console.log('Response status:', response.status);
+            console.log('Response headers:', response.headers);
+
             if (response.ok) {
-                this.showStatus('connectionStatus', 'Connection successful! ✓', 'success');
+                const data = await response.json();
+                console.log('Repository data:', data.name);
+                this.showStatus('connectionStatus', `Connection successful! Found repository: ${data.full_name} ✓`, 'success');
             } else {
-                const error = await response.json();
-                this.showStatus('connectionStatus', `Connection failed: ${error.message}`, 'error');
+                const errorText = await response.text();
+                console.log('Error response:', errorText);
+                let errorMessage = `HTTP ${response.status}`;
+                
+                try {
+                    const errorData = JSON.parse(errorText);
+                    errorMessage = errorData.message || errorMessage;
+                } catch (e) {
+                    errorMessage = errorText || errorMessage;
+                }
+                
+                this.showStatus('connectionStatus', `Connection failed: ${errorMessage}`, 'error');
             }
         } catch (error) {
+            console.error('Connection error:', error);
             this.showStatus('connectionStatus', `Connection failed: ${error.message}`, 'error');
         }
     }
@@ -341,8 +377,9 @@ class UpdateManager {
             let sha = null;
             const getResponse = await fetch(`https://api.github.com/repos/${this.githubSettings.owner}/${this.githubSettings.repo}/contents/${this.githubSettings.filePath}`, {
                 headers: {
-                    'Authorization': `token ${this.githubSettings.token}`,
-                    'Accept': 'application/vnd.github.v3+json'
+                    'Authorization': `Bearer ${this.githubSettings.token}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'User-Agent': 'System-Update-Manager'
                 }
             });
 
@@ -355,9 +392,10 @@ class UpdateManager {
             const updateResponse = await fetch(`https://api.github.com/repos/${this.githubSettings.owner}/${this.githubSettings.repo}/contents/${this.githubSettings.filePath}`, {
                 method: 'PUT',
                 headers: {
-                    'Authorization': `token ${this.githubSettings.token}`,
+                    'Authorization': `Bearer ${this.githubSettings.token}`,
                     'Accept': 'application/vnd.github.v3+json',
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'System-Update-Manager'
                 },
                 body: JSON.stringify({
                     message: `Update system_update.json - ${new Date().toISOString()}`,
