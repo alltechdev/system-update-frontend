@@ -64,6 +64,10 @@ class UpdateManager {
             this.syncToGitHub();
         });
 
+        document.getElementById('downloadConfig').addEventListener('click', () => {
+            this.downloadJSON();
+        });
+
         document.getElementById('uploadConfig').addEventListener('click', () => {
             this.uploadConfiguration();
         });
@@ -315,18 +319,22 @@ class UpdateManager {
     loadConfiguration(config) {
         try {
             if (config.updates) {
-                this.updates = config.updates;
+                // Append updates instead of overwriting
+                Object.keys(config.updates).forEach(version => {
+                    if (!this.updates[version]) {
+                        this.updates[version] = config.updates[version];
+                    }
+                });
             }
-            if (config.latest_version) {
-                this.latestVersion = config.latest_version;
-            } else {
-                this.latestVersion = this.getLatestVersion();
-            }
+            
+            // Update latest version
+            this.latestVersion = this.getLatestVersion();
             
             this.renderUpdates();
             this.updateJSON();
             
-            alert('Configuration loaded successfully!');
+            const newVersions = config.updates ? Object.keys(config.updates).filter(v => !this.updates[v] || this.updates[v] === config.updates[v]) : [];
+            alert(`Configuration imported successfully! Added ${newVersions.length} new updates.`);
         } catch (error) {
             alert('Error loading configuration: ' + error.message);
         }

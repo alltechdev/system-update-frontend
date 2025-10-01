@@ -101,14 +101,10 @@
                     <button id="downloadJson" class="btn-secondary">
                         <i class="fas fa-download"></i> Download
                     </button>
-                    <button id="uploadConfig" class="btn-secondary">
-                        <i class="fas fa-upload"></i> Upload Config
-                    </button>
                     <button id="syncToGitHub" class="btn-primary">
                         <i class="fas fa-sync"></i> Sync to GitHub
                     </button>
                 </div>
-                <input type="file" id="configFileInput" accept=".json" style="display: none;">
                 <div id="syncStatus" class="sync-status"></div>
                 <pre id="jsonOutput" class="json-output">
 {
@@ -165,6 +161,20 @@
                         <i class="fas fa-plug"></i> Test Connection
                     </button>
                 </form>
+                
+                <div class="card" style="margin-top: 20px;">
+                    <h3><i class="fas fa-file-import"></i> Configuration Management</h3>
+                    <div class="json-actions">
+                        <button id="downloadConfig" class="btn-secondary">
+                            <i class="fas fa-download"></i> Download Current Config
+                        </button>
+                        <button id="uploadConfig" class="btn-secondary">
+                            <i class="fas fa-upload"></i> Import Config (Append)
+                        </button>
+                    </div>
+                    <input type="file" id="configFileInput" accept=".json" style="display: none;">
+                    <p class="settings-info">Download your current configuration or import updates from a JSON file. Import will append new updates without overwriting existing ones.</p>
+                </div>
 
                 <div id="connectionStatus" class="connection-status"></div>
             </div>
