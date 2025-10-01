@@ -18,6 +18,7 @@
             <button class="tab-button active" data-tab="updates">Updates</button>
             <button class="tab-button" data-tab="json">JSON Output</button>
             <button class="tab-button" data-tab="preview">Preview</button>
+            <button class="tab-button" data-tab="settings">Settings</button>
         </div>
 
         <div id="updates" class="tab-content active">
@@ -81,7 +82,11 @@
                     <button id="downloadJson" class="btn-secondary">
                         <i class="fas fa-download"></i> Download
                     </button>
+                    <button id="syncToGitHub" class="btn-primary">
+                        <i class="fas fa-sync"></i> Sync to GitHub
+                    </button>
                 </div>
+                <div id="syncStatus" class="sync-status"></div>
                 <pre id="jsonOutput" class="json-output">
 {
   "latest_version": "",
@@ -114,6 +119,48 @@
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <div id="settings" class="tab-content">
+            <div class="card">
+                <h2><i class="fas fa-cog"></i> GitHub Integration</h2>
+                <p class="settings-info">
+                    Configure GitHub integration to automatically sync updates to your repository.
+                    <a href="https://github.com/settings/tokens" target="_blank">Create a Personal Access Token</a> with 'repo' permissions.
+                </p>
+                
+                <form id="settingsForm">
+                    <div class="form-group">
+                        <label for="githubToken">GitHub Personal Access Token</label>
+                        <input type="password" id="githubToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+                        <small>Token is stored locally in your browser only</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="repoOwner">Repository Owner</label>
+                        <input type="text" id="repoOwner" value="alltechdev" placeholder="username or organization">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="repoName">Repository Name</label>
+                        <input type="text" id="repoName" value="alltech.dev" placeholder="repository-name">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="filePath">File Path</label>
+                        <input type="text" id="filePath" value="system_update.json" placeholder="path/to/file.json">
+                    </div>
+
+                    <button type="submit" class="btn-primary">
+                        <i class="fas fa-save"></i> Save Settings
+                    </button>
+                    <button type="button" id="testConnection" class="btn-secondary">
+                        <i class="fas fa-plug"></i> Test Connection
+                    </button>
+                </form>
+
+                <div id="connectionStatus" class="connection-status"></div>
             </div>
         </div>
 

@@ -2,6 +2,7 @@ class UpdateManager {
     constructor() {
         this.updates = {};
         this.latestVersion = '';
+        this.githubSettings = this.loadGitHubSettings();
         this.init();
     }
 
@@ -10,6 +11,7 @@ class UpdateManager {
         this.setupForm();
         this.setupButtons();
         this.setupPreview();
+        this.setupSettings();
         this.updateJSON();
     }
 
@@ -51,6 +53,10 @@ class UpdateManager {
 
         document.getElementById('downloadJson').addEventListener('click', () => {
             this.downloadJSON();
+        });
+
+        document.getElementById('syncToGitHub').addEventListener('click', () => {
+            this.syncToGitHub();
         });
     }
 
@@ -243,6 +249,145 @@ class UpdateManager {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+    }
+
+    setupSettings() {
+        const settingsForm = document.getElementById('settingsForm');
+        const testBtn = document.getElementById('testConnection');
+        
+        // Load saved settings
+        this.loadSettingsToForm();
+        
+        settingsForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.saveGitHubSettings();
+        });
+        
+        testBtn.addEventListener('click', () => {
+            this.testGitHubConnection();
+        });
+    }
+
+    loadGitHubSettings() {
+        const saved = localStorage.getItem('githubSettings');
+        return saved ? JSON.parse(saved) : {
+            token: '',
+            owner: 'alltechdev',
+            repo: 'alltech.dev',
+            filePath: 'system_update.json'
+        };
+    }
+
+    saveGitHubSettings() {
+        const settings = {
+            token: document.getElementById('githubToken').value,
+            owner: document.getElementById('repoOwner').value,
+            repo: document.getElementById('repoName').value,
+            filePath: document.getElementById('filePath').value
+        };
+
+        this.githubSettings = settings;
+        localStorage.setItem('githubSettings', JSON.stringify(settings));
+        
+        this.showStatus('connectionStatus', 'Settings saved successfully!', 'success');
+    }
+
+    loadSettingsToForm() {
+        document.getElementById('githubToken').value = this.githubSettings.token;
+        document.getElementById('repoOwner').value = this.githubSettings.owner;
+        document.getElementById('repoName').value = this.githubSettings.repo;
+        document.getElementById('filePath').value = this.githubSettings.filePath;
+    }
+
+    async testGitHubConnection() {
+        if (!this.githubSettings.token) {
+            this.showStatus('connectionStatus', 'Please enter a GitHub token first', 'error');
+            return;
+        }
+
+        this.showStatus('connectionStatus', 'Testing connection...', 'loading');
+
+        try {
+            const response = await fetch(`https://api.github.com/repos/${this.githubSettings.owner}/${this.githubSettings.repo}`, {
+                headers: {
+                    'Authorization': `token ${this.githubSettings.token}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            });
+
+            if (response.ok) {
+                this.showStatus('connectionStatus', 'Connection successful! ✓', 'success');
+            } else {
+                const error = await response.json();
+                this.showStatus('connectionStatus', `Connection failed: ${error.message}`, 'error');
+            }
+        } catch (error) {
+            this.showStatus('connectionStatus', `Connection failed: ${error.message}`, 'error');
+        }
+    }
+
+    async syncToGitHub() {
+        if (!this.githubSettings.token) {
+            this.showStatus('syncStatus', 'Please configure GitHub settings first', 'error');
+            return;
+        }
+
+        this.showStatus('syncStatus', 'Syncing to GitHub...', 'loading');
+
+        try {
+            const jsonContent = document.getElementById('jsonOutput').textContent;
+            
+            // Get current file (if exists) to get SHA
+            let sha = null;
+            const getResponse = await fetch(`https://api.github.com/repos/${this.githubSettings.owner}/${this.githubSettings.repo}/contents/${this.githubSettings.filePath}`, {
+                headers: {
+                    'Authorization': `token ${this.githubSettings.token}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            });
+
+            if (getResponse.ok) {
+                const fileData = await getResponse.json();
+                sha = fileData.sha;
+            }
+
+            // Update or create file
+            const updateResponse = await fetch(`https://api.github.com/repos/${this.githubSettings.owner}/${this.githubSettings.repo}/contents/${this.githubSettings.filePath}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `token ${this.githubSettings.token}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: `Update system_update.json - ${new Date().toISOString()}`,
+                    content: btoa(jsonContent),
+                    sha: sha
+                })
+            });
+
+            if (updateResponse.ok) {
+                const result = await updateResponse.json();
+                this.showStatus('syncStatus', 'Successfully synced to GitHub! Your Android app will now see the updates.', 'success');
+            } else {
+                const error = await updateResponse.json();
+                this.showStatus('syncStatus', `Sync failed: ${error.message}`, 'error');
+            }
+        } catch (error) {
+            this.showStatus('syncStatus', `Sync failed: ${error.message}`, 'error');
+        }
+    }
+
+    showStatus(elementId, message, type) {
+        const element = document.getElementById(elementId);
+        element.textContent = message;
+        element.className = `${elementId} ${type}`;
+        
+        if (type === 'success') {
+            setTimeout(() => {
+                element.style.display = 'none';
+            }, 5000);
+        }
     }
 
     // Demo data for testing
